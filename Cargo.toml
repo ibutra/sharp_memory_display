@@ -1,0 +1,8 @@
+[package]
+name = "sharp_memory"
+version = "0.1.0"
+authors = ["Stefan Rakel <rakel@embedded.rwth-aachen.de>"]
+edition = "2018"
+
+[dependencies]
+embedded-hal = "0.2.1"
