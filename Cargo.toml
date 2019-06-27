@@ -1,8 +1,15 @@
 [package]
-name = "sharp_memory"
+name = "sharp_memory_display"
 version = "0.1.0"
-authors = ["Stefan Rakel <rakel@embedded.rwth-aachen.de>"]
+authors = ["Stefan Rakel"]
 edition = "2018"
+license = "MIT"
+categories = ["embedded", "hardware-support", "no-std"]
+description = "Driver for the sharp memory display sold by Adafruit"
+documentation = "https://docs.rs/sharp_memory_display"
+keywords = ["embedded-hal-driver", "display", "sharp", "driver"]
+repository = "https://github.com/ibutra/sharp_memory_display"
+readme = "README.md"
 
 [dependencies]
 embedded-hal = "0.2.1"

@@ -50,29 +50,74 @@ where
         for val in self.buffer.iter_mut() {
             *val = 0;
         }
-        let buf = [0x00];
-        self.write_bytes(CommandBit::ClearBit, &buf)?;
+        //Chip select
+        if let Err(_) = self.cs.set_low() {
+            return Err(());
+        };
+        let command = self.command(CommandBit::ClearBit);
+        let mut failure = false;
+        if let Ok(_) = self.write_byte(command) {
+            if let Err(_) = self.write_byte(0) {
+                failure = true;
+            }
+        } else {
+            failure = true;
+        }
+        if let Err(_) = self.cs.set_high() {
+            return Err(());
+        };
+        if failure {
+            return Err(());
+        };
         Ok(())
     }
 
     /// Refresh function. Should be called periodically with >1Hz to update display
     pub fn refresh(&mut self) -> Result<(), ()> {
-        // const SEND_BUFF_SIZE: usize = BUFFER_SIZE + 2 * HEIGHT as usize + 1;
-        // let mut buf : [u8; SEND_BUFF_SIZE] = [0; SEND_BUFF_SIZE]; // Size of Buffer plus line number plus end line bit and one final zero bit
-        // let byte_per_line = BUFFER_SIZE / HEIGHT as usize; //If this isn't even we have a problem houston
-        // for line in 0..HEIGHT {
-        //     let index = line as usize * (byte_per_line + 2);
-        //     buf[index] = line;
-        //     for byte in 0..byte_per_line {
-        //         buf[index + byte] = self.buffer[line as usize * byte_per_line + byte];
-        //     }
-        //     buf[index + byte_per_line] = 0;
-        // }
-        // buf[BUFFER_SIZE + 2 * HEIGHT as usize + 1] = 0;
+        
+        //Chipselect
+        if let Err(_) = self.cs.set_low() {
+            return Err(());
+        };
+        
+        let cmd = self.command(CommandBit::WriteCmd);
+        let mut failure = false;
+        if let Ok(_) = self.write_byte(cmd) {
+            let mut old_line: u8 = 1;
+            let mut current_line: u8;
+            for i in 0..BUFFER_SIZE {
+                if let Err(_) = self.write_byte(self.buffer[i]) {
+                    failure = true;
+                    break;
+                }
+                current_line = (((i+1)/(WIDTH as usize/8)) + 1) as u8;
+                if current_line != old_line {
+                    if let Err(_) = self.write_byte(0) {
+                        failure = true;
+                        break;
+                    }
+                    if current_line <= HEIGHT {
+                        if let Err(_) = self.write_byte(current_line as u8 ) {
+                            failure = true;
+                            break;
+                        }
+                    }
+                    old_line = current_line;
+                }
+            }
 
-        // self.write_bytes(CommandBit::WriteCmd, &buf)?;
+            if let Err(_) = self.write_byte(0) {
+                failure = true;
+            }
+        }
+        if let Err(_) = self.cs.set_high() {
+            return Err(());
+        };
+
+        if failure {
+            return Err(());
+        }
         Ok(())
-
     }
 
     /// Set a pixel
@@ -99,31 +144,19 @@ where
 
     }
 
-    fn write_bytes(&mut self, command: CommandBit, data: &[u8]) -> Result<(), ()> {
-
-        let mut cmd = command as u8;
+    fn command(&mut self, command: CommandBit) -> u8 {
+        let mut command = command as u8;
         if self.vcom {
-            cmd |= 0x40; //Magic number from datasheet
-        };
+            command |= 0x40; //Magic number from datasheet
+        }
         self.toggle_vcom();
-        
-        //Chip select
-        let cs_result = self.cs.set_low();
-        if cs_result.is_err() {
-            return Err(());
-        }
-        //First send the command bits
-        let mut result = self.com.write(&[cmd]);
-        if result.is_ok() { //If command bits were send successfully write the actual data
-            result = self.com.write(&data);
-        }
+        command
+    }
 
-        //Disable chip select
-        let cs_result = self.cs.set_high();
-        if result.is_err() { //Spi Error has precedence over io error
-            return Err(());
-        }
-        if cs_result.is_err() {
+    fn write_byte(&mut self, data: u8) -> Result<(), ()> {
+        //First send the command bits
+        let result = self.com.write(&[data]);
+        if result.is_err() {
             return Err(());
         }
         Ok(())
@@ -135,7 +168,7 @@ where
 }
 
 enum CommandBit {
-    // WriteCmd = 0x80,
+    WriteCmd = 0x80,
     ClearBit = 0x20,
 }
 
